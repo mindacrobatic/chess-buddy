@@ -7,7 +7,7 @@ tests — each demo is a single `.html` file opened directly in a browser.
 
 Current demos:
 
-- `chess/index.html` — chess vs. an in-browser engine, or 2-player local
+- `chess/index.html` — chess vs. an in-browser engine
   (~2300 lines, everything inline).
 
 ## Tech conventions

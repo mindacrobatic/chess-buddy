@@ -436,8 +436,7 @@
     <div class="card">
       <div class="card-h">Game setup</div>
       <div class="seg" id="modeRow">
-        <button class="mode-btn active" data-mode="off">2 Players</button>
-        <button class="mode-btn" data-mode="b">You: White</button>
+        <button class="mode-btn active" data-mode="b">You: White</button>
         <button class="mode-btn" data-mode="w">You: Black</button>
       </div>
       <div class="strength-row" id="strengthRow">
@@ -1827,7 +1826,7 @@ let selected = null;
 let flipped = false;
 let gameOver = null;       // {result: 'w'|'b'|'draw', reason}
 let pendingPromo = null;   // {moves: [...]} awaiting promotion choice
-let engineColor = null;    // null | 'w' | 'b' — color played by the engine
+let engineColor = "b";     // 'w' | 'b' — color played by the engine
 let thinking = false;
 let reqId = 0;
 let worker = null;
@@ -1960,7 +1959,7 @@ function renderMoves() {
 const escSan = s => s.replace(/</g, "&lt;");
 
 function updateSetupMeta() {
-  setupMetaEl.textContent = engineColor ? `vs engine · ${LEVELS[levelIdx].name}` : "2 players";
+  setupMetaEl.textContent = `vs engine · ${LEVELS[levelIdx].name}`;
 }
 
 function updateStatus() {
@@ -2191,7 +2190,7 @@ document.getElementById("flipBtn").onclick = () => {
 document.getElementById("modeRow").addEventListener("click", e => {
   const btn = e.target.closest(".mode-btn");
   if (!btn) return;
-  const newColor = btn.dataset.mode === "off" ? null : btn.dataset.mode;
+  const newColor = btn.dataset.mode;
   if (newColor === engineColor) return;
   if (thinking) stopEngine();
   engineColor = newColor;
