@@ -8,7 +8,7 @@ tests — each demo is a single `.html` file opened directly in a browser.
 Current demos:
 
 - `chess/index.html` — chess vs. an in-browser engine, or 2-player local
-  (~2200 lines, everything inline).
+  (~2300 lines, everything inline).
 
 ## Tech conventions
 
@@ -34,16 +34,17 @@ python3 -m http.server 8000
 
 The file has four parts, in order:
 
-1. **`<style>`** (lines ~7–360) — all CSS.
-2. **HTML markup** (lines ~363–412) — board container, side panel (mode /
-   strength / status / captured / moves / buttons), promotion overlay.
-3. **Engine source, as inert text** (lines ~414–1476) —
+1. **`<style>`** (lines ~7–416) — all CSS.
+2. **HTML markup** (lines ~419–478) — board container, side panel (card-based:
+   status / game setup with mode + strength / material / moves / buttons),
+   promotion overlay.
+3. **Engine source, as inert text** (lines ~481–1543) —
    `<script id="engine-src" type="text/plain">`. This is the engine.
    Because its type is `text/plain`, the browser does not execute it. The
    controller extracts its `textContent`, wraps it in a `Blob`, and creates
    a Web Worker from it. **When editing the engine, you are editing text
    that will run inside a worker — it has no DOM access.**
-4. **Controller / UI** (last `<script>`, lines ~1478–end) — executes on the
+4. **Controller / UI** (last `<script>`, lines ~1545–end) — executes on the
    main thread. Owns game state, rendering, input, and the worker bridge.
 
 ### Two independent chess implementations (important!)

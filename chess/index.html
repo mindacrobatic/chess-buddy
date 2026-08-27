@@ -153,16 +153,41 @@
   .coord.dark  { color: #f0d9b5; }
 
   .panel {
-    width: 290px;
+    width: 320px;
+    align-self: stretch;
     background: rgba(15, 23, 42, .58);
     border: 1px solid rgba(148, 163, 184, .14);
     border-radius: 16px;
-    padding: 20px;
+    padding: 16px;
     backdrop-filter: blur(14px);
     box-shadow: 0 24px 60px rgba(0, 0, 0, .4);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+  }
+  .card {
+    background: rgba(30, 41, 59, .5);
+    border: 1px solid rgba(148, 163, 184, .14);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .card-h {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 10.5px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #8ea0b8;
+    font-weight: 700;
+    margin-bottom: 9px;
+  }
+  .card-h .right {
+    letter-spacing: 0;
+    text-transform: none;
+    color: #64748b;
+    font-weight: 600;
   }
   .app-title {
     display: flex;
@@ -179,7 +204,14 @@
     color: #f0d9b5;
     text-shadow: 0 2px 6px rgba(0, 0, 0, .5);
   }
-  .status { font-size: 17px; font-weight: 600; min-height: 24px; }
+  .status {
+    font-size: 17px;
+    font-weight: 700;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
   .status .badge {
     display: inline-block;
     padding: 2px 10px;
@@ -209,36 +241,37 @@
     0%, 60%, 100% { transform: translateY(0); opacity: .35; }
     30% { transform: translateY(-4px); opacity: 1; }
   }
-  .captured { display: flex; flex-direction: column; gap: 8px; min-height: 56px; }
-  .cap-row { font-size: 22px; letter-spacing: 2px; min-height: 26px; line-height: 26px; }
-  .cap-row span { margin-right: 1px; }
-  .cap-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; }
-  .mat-adv {
-    font-size: 12px;
-    font-weight: 700;
-    color: #86efac;
-    margin-left: 7px;
-    vertical-align: 3px;
+  .mat-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; min-height: 30px; }
+  .mat-who { width: 44px; flex: none; font-size: 12px; font-weight: 700; color: #94a3b8; }
+  .mat-pcs { flex: 1; font-size: 21px; letter-spacing: 2px; line-height: 1.2; }
+  .chip {
+    flex: none;
+    font-size: 11px;
+    font-weight: 800;
+    color: #052e16;
+    background: #86efac;
+    border-radius: 999px;
+    padding: 2px 8px;
   }
+  .chip.even { color: #94a3b8; background: rgba(148, 163, 184, .15); }
+  .moves-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .moves {
-    height: 200px;
+    flex: 1;
+    min-height: 130px;
     overflow-y: auto;
-    background: rgba(0, 0, 0, .3);
-    border: 1px solid rgba(148, 163, 184, .1);
-    border-radius: 10px;
-    padding: 8px 12px;
     font-family: ui-monospace, Menlo, monospace;
     font-size: 13px;
-    line-height: 1.7;
     scrollbar-width: thin;
     scrollbar-color: #334155 transparent;
   }
   .moves::-webkit-scrollbar { width: 8px; }
   .moves::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-  .moves div { border-radius: 4px; padding: 0 4px; margin: 0 -4px; }
-  .moves div:hover { background: rgba(255, 255, 255, .05); }
-  .moves .num { color: #64748b; margin-right: 6px; }
-  .btns { display: flex; gap: 10px; }
+  .mrow { display: grid; grid-template-columns: 30px 1fr 1fr; padding: 2px 4px; border-radius: 4px; }
+  .mrow:nth-child(odd) { background: rgba(148, 163, 184, .06); }
+  .mrow .num { color: #64748b; }
+  .mrow .mv.last { color: #93c5fd; font-weight: 700; }
+  .btns { display: flex; flex-direction: column; gap: 8px; }
+  .btns .row2 { display: flex; gap: 8px; }
   button {
     flex: 1;
     padding: 10px;
@@ -301,57 +334,80 @@
   }
   .promo-choices div:hover { transform: scale(1.12); }
 
-  .mode-row { display: flex; gap: 8px; }
-  .mode-btn {
+  .seg {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    background: rgba(2, 6, 23, .45);
+    border: 1px solid rgba(148, 163, 184, .14);
+    border-radius: 10px;
+  }
+  .seg .mode-btn {
     flex: 1;
-    padding: 8px 4px;
+    padding: 7px 4px;
     font-size: 12px;
     font-weight: 600;
-    background: #334155;
+    background: transparent;
     color: #cbd5e1;
-    border: 1px solid transparent;
+    border: none;
+    border-radius: 8px;
+    box-shadow: none;
   }
-  .mode-btn:hover { background: #3f4c63; }
-  .mode-btn.active {
+  .seg .mode-btn:hover { color: #fff; }
+  .seg .mode-btn:hover,
+  .seg .mode-btn:active { transform: none; filter: none; }
+  .seg .mode-btn.active {
     background: linear-gradient(135deg, #3b82f6, #2563eb);
     color: #fff;
-    box-shadow: 0 3px 12px rgba(37, 99, 235, .45);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, .4);
   }
   .enginfo {
     font-family: ui-monospace, Menlo, monospace;
-    font-size: 12px;
+    font-size: 11.5px;
     color: #94a3b8;
-    min-height: 16px;
     word-break: break-all;
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px dashed rgba(148, 163, 184, .18);
   }
-  .strength-row {
-    display: none;
-    flex-direction: column;
-    gap: 7px;
-    padding-top: 3px;
-    border-top: 1px solid rgba(148, 163, 184, .1);
+  .enginfo:empty { display: none; }
+  .strength-row { display: none; }
+  .strength-row.visible { display: block; }
+  .mini-label {
+    font-size: 10.5px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #8ea0b8;
+    font-weight: 700;
+    margin: 10px 0 6px;
   }
-  .strength-row.visible { display: flex; }
-  .strength-opts { display: flex; gap: 12px; }
+  .strength-opts { display: flex; gap: 6px; }
   .radio-opt {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
     font-size: 12px;
     font-weight: 600;
     color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, .14);
+    border-radius: 999px;
     cursor: pointer;
     user-select: none;
     transition: color .15s ease;
   }
   .radio-opt:hover { color: #e2e8f0; }
-  .radio-opt:has(input:checked) { color: #93c5fd; }
+  .radio-opt:has(input:checked) {
+    color: #fff;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: transparent;
+  }
   .radio-opt input[type="radio"] {
-    width: 14px;
-    height: 14px;
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
     margin: 0;
-    accent-color: #2563eb;
-    cursor: pointer;
+    pointer-events: none;
   }
 
   @media (max-width: 720px) {
@@ -370,36 +426,47 @@
 
   <div class="panel">
     <div class="app-title"><span class="title-glyph">♞</span> Chess</div>
-    <div class="mode-row" id="modeRow">
-      <button class="mode-btn active" data-mode="off">2 Players</button>
-      <button class="mode-btn" data-mode="b">You: White</button>
-      <button class="mode-btn" data-mode="w">You: Black</button>
+
+    <div class="card">
+      <div class="card-h">Status <span class="right" id="setupMeta"></span></div>
+      <div class="status" id="status"></div>
+      <div class="enginfo" id="engInfo"></div>
     </div>
-    <div class="strength-row" id="strengthRow">
-      <div class="cap-label">Engine Strength</div>
-      <div class="strength-opts">
-        <label class="radio-opt"><input type="radio" name="strength" id="strengthNewbie" value="0"><span>Newbie</span></label>
-        <label class="radio-opt"><input type="radio" name="strength" id="strengthOkayish" value="1"><span>Okayish</span></label>
-        <label class="radio-opt"><input type="radio" name="strength" id="strengthBoss" value="2" checked><span>Boss mode</span></label>
+
+    <div class="card">
+      <div class="card-h">Game setup</div>
+      <div class="seg" id="modeRow">
+        <button class="mode-btn active" data-mode="off">2 Players</button>
+        <button class="mode-btn" data-mode="b">You: White</button>
+        <button class="mode-btn" data-mode="w">You: Black</button>
+      </div>
+      <div class="strength-row" id="strengthRow">
+        <div class="mini-label">Engine strength</div>
+        <div class="strength-opts">
+          <label class="radio-opt"><input type="radio" name="strength" id="strengthNewbie" value="0"><span>Newbie</span></label>
+          <label class="radio-opt"><input type="radio" name="strength" id="strengthOkayish" value="1"><span>Okayish</span></label>
+          <label class="radio-opt"><input type="radio" name="strength" id="strengthBoss" value="2" checked><span>Boss mode</span></label>
+        </div>
       </div>
     </div>
-    <div class="status" id="status"></div>
-    <div class="enginfo" id="engInfo"></div>
-    <div class="captured">
-      <div>
-        <div class="cap-label">Captured by White</div>
-        <div class="cap-row" id="capByWhite"></div>
-      </div>
-      <div>
-        <div class="cap-label">Captured by Black</div>
-        <div class="cap-row" id="capByBlack"></div>
-      </div>
+
+    <div class="card">
+      <div class="card-h">Material <span class="right">captured pieces</span></div>
+      <div class="mat-row"><span class="mat-who">White</span><span class="mat-pcs glyph-w" id="capByWhite"></span><span class="chip even" id="chipWhite">=</span></div>
+      <div class="mat-row"><span class="mat-who">Black</span><span class="mat-pcs glyph-b" id="capByBlack"></span><span class="chip even" id="chipBlack">=</span></div>
     </div>
-    <div class="moves" id="moves"></div>
+
+    <div class="card moves-card">
+      <div class="card-h">Moves <span class="right" id="movesLast"></span></div>
+      <div class="moves" id="moves"></div>
+    </div>
+
     <div class="btns">
-      <button id="undoBtn">Undo</button>
-      <button id="flipBtn" class="secondary">Flip</button>
-      <button id="newBtn" class="secondary">New Game</button>
+      <button id="newBtn">New Game</button>
+      <div class="row2">
+        <button id="undoBtn" class="secondary">Undo</button>
+        <button id="flipBtn" class="secondary">Flip</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1780,6 +1847,10 @@ const statusEl = document.getElementById("status");
 const movesEl  = document.getElementById("moves");
 const capWEl   = document.getElementById("capByWhite");
 const capBEl   = document.getElementById("capByBlack");
+const chipWEl  = document.getElementById("chipWhite");
+const chipBEl  = document.getElementById("chipBlack");
+const setupMetaEl = document.getElementById("setupMeta");
+const movesLastEl = document.getElementById("movesLast");
 const engInfoEl = document.getElementById("engInfo");
 posKeys = [posKey()];
 
@@ -1862,27 +1933,38 @@ function drawCaptured() {
   const VAL = { p: 1, n: 3, b: 3, r: 5, q: 9 };
   const matVal = o => Object.entries(o).reduce((s, [t, n]) => s + VAL[t] * n, 0);
   const adv = matVal(caps.byWhite) - matVal(caps.byBlack);
-  capWEl.innerHTML = `<span class="glyph-w">${str(caps.byWhite)}</span>` +
-    (adv > 0 ? `<span class="mat-adv">+${adv}</span>` : "");
-  capBEl.innerHTML = `<span class="glyph-b">${str(caps.byBlack)}</span>` +
-    (adv < 0 ? `<span class="mat-adv">+${-adv}</span>` : "");
+  capWEl.textContent = str(caps.byWhite);
+  capBEl.textContent = str(caps.byBlack);
+  chipWEl.textContent = adv > 0 ? `+${adv}` : "=";
+  chipBEl.textContent = adv < 0 ? `+${-adv}` : "=";
+  chipWEl.classList.toggle("even", adv <= 0);
+  chipBEl.classList.toggle("even", adv >= 0);
 }
 
 function renderMoves() {
-  movesEl.innerHTML = history
-    .reduce((rows, h, i) => {
-      if (i % 2 === 0) rows.push([]);
-      rows[rows.length - 1].push(h.san);
-      return rows;
-    }, [])
-    .map((pair, i) =>
-      `<div><span class="num">${i + 1}.</span>${pair.map(sanEscape).join(" ")}</div>`)
-    .join("");
+  const lastIdx = history.length - 1;
+  let html = "";
+  for (let i = 0; i < history.length; i += 2) {
+    const wLast = i === lastIdx ? " last" : "";
+    const bLast = i + 1 === lastIdx ? " last" : "";
+    html += `<div class="mrow"><span class="num">${i / 2 + 1}.</span>` +
+      `<span class="mv${wLast}">${escSan(history[i].san)}</span>` +
+      `<span class="mv${bLast}">${i + 1 < history.length ? escSan(history[i + 1].san) : ""}</span></div>`;
+  }
+  movesEl.innerHTML = html;
   movesEl.scrollTop = movesEl.scrollHeight;
+  movesLastEl.textContent = history.length
+    ? `${Math.floor(lastIdx / 2) + 1}${lastIdx % 2 ? "…" : "."} ${history[lastIdx].san}`
+    : "";
 }
-const sanEscape = s => `<span>${s.replace(/</g, "&lt;")}</span>`;
+const escSan = s => s.replace(/</g, "&lt;");
+
+function updateSetupMeta() {
+  setupMetaEl.textContent = engineColor ? `vs engine · ${LEVELS[levelIdx].name}` : "2 players";
+}
 
 function updateStatus() {
+  updateSetupMeta();
   if (thinking) {
     const label = state.turn === "w" ? "White" : "Black";
     statusEl.innerHTML =
@@ -2148,6 +2230,7 @@ strengthRadios.forEach((radio, i) => {
     if (!radio.checked) return;
     levelIdx = i;
     try { localStorage.setItem("chessStrength", String(levelIdx)); } catch (e) {}
+    updateSetupMeta();
     if (thinking) { stopEngine(); requestEngineMove(); }
   });
 });
