@@ -42,6 +42,26 @@
     position: relative;
     width: min(92vw, 85vh, 620px);
   }
+  .eval-bar {
+    position: absolute;
+    left: 5px;
+    top: 18px;
+    bottom: 18px;
+    width: 11px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #2b2b2b, #171717);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .65), 0 1px 2px rgba(0,0,0,.4);
+    overflow: hidden;
+    z-index: 3;
+  }
+  .eval-fill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 50%;
+    background: linear-gradient(180deg, #fdfdfd, #cfcfcf);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+    transition: height .5s cubic-bezier(.3,.7,.3,1);
+  }
   .board {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
@@ -520,6 +540,9 @@
 <body>
 <div class="app">
   <div class="board-outer" id="boardOuter">
+    <div class="eval-bar" id="evalBar" title="Engine evaluation">
+      <div class="eval-fill" id="evalFill"></div>
+    </div>
     <div class="board-wrap">
       <div class="board" id="board"></div>
     </div>
@@ -2025,6 +2048,29 @@ function requestEngineMove() {
   render();
 }
 function whiteScoreOf(s) { return engineColor === "w" ? s : -s; }
+
+/* --- eval bar --- */
+
+let evalWhiteCp = 0;               // latest engine score, white perspective
+const evalBarEl = document.getElementById("evalBar");
+const evalFillEl = document.getElementById("evalFill");
+
+// Map centipawns to a 0–100 "white share" with a sigmoid (±4 pawns ≈ 73%).
+function updateEvalBar() {
+  let pct;
+  if (gameOver) {
+    pct = gameOver.result === "draw" ? 50
+        : gameOver.result === "w" ? 100 : 0;
+  } else {
+    const cp = Math.max(-1200, Math.min(1200, evalWhiteCp)); // mate ≈ full bar
+    pct = 100 / (1 + Math.exp(-cp / 400));
+  }
+  evalFillEl.style.height = pct + "%";
+  evalBarEl.title = gameOver
+    ? (gameOver.result === "draw" ? "Draw" :
+       (gameOver.result === "w" ? "White wins" : "Black wins") + " — " + gameOver.reason)
+    : "Engine evaluation: " + (thinking ? "…" : fmtScore(evalWhiteCp));
+}
 function fmtScore(s) {
   if (Math.abs(s) > 29000) {
     const d = Math.ceil((30000 - Math.abs(s)) / 2);
@@ -2036,14 +2082,17 @@ function fmtScore(s) {
 function onEngineMsg(e) {
   const msg = e.data;
   if (msg.cmd === "info" && msg.id === reqId && thinking) {
+    evalWhiteCp = whiteScoreOf(msg.score);
     const knps = Math.round(msg.nodes / Math.max(msg.time, 1));
     engInfoEl.textContent =
       `depth ${msg.depth} · ${fmtScore(whiteScoreOf(msg.score))} · ${knps}k n/s` +
       (msg.pv && msg.pv.length ? ` · ${msg.pv.slice(0, 6).join(" ")}` : "");
+    updateEvalBar();
   }
   if (msg.cmd === "best" && msg.id === reqId && thinking) {
     thinking = false;
     if (!msg.move || gameOver) { render(); return; }
+    evalWhiteCp = whiteScoreOf(msg.score);
     const from = [msg.from >> 3, msg.from & 7];
     const to = [msg.to >> 3, msg.to & 7];
     const promo = msg.promo ? PROMO_CHR[msg.promo] : null;
@@ -2193,6 +2242,7 @@ function render() {
   updateStatus();
   drawCaptured();
   renderMoves();
+  updateEvalBar();
   document.getElementById("undoBtn").disabled = !history.length || !!pendingPromo || thinking;
 }
 
@@ -2675,6 +2725,7 @@ document.getElementById("newBtn").onclick = () => {
   currentLegal = [];
   gameOver = null;
   pendingPromo = null;
+  evalWhiteCp = 0;
   engInfoEl.textContent = "";
   chatReset();
   render();

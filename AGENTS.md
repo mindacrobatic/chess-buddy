@@ -189,6 +189,14 @@ request it sends the **full move list**; the engine replays it from
   in the button row; state persists as `chessSound`. Alternative packs
   (Classic Wood with a noise "thock", Modern Click, Retro 8-bit,
   Cinematic) live in `chess/sounds.html` for preview.
+- **Eval bar**: `.eval-bar` (in the board frame's left padding) holds
+  `.eval-fill`, whose height = white's share from a sigmoid of
+  `evalWhiteCp` (±1200 cp clamp; ±400 cp ≈ sigmoid midpoint scale).
+  `evalWhiteCp` is updated from every `info` and `best` engine message
+  (white perspective via `whiteScoreOf`); `updateEvalBar()` is called
+  from `render()` and from the `info` handler, so the bar moves live
+  during search. New game resets it to equal; game end snaps it to
+  100/0/50.
 
 ## Verifying changes
 
