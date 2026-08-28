@@ -383,16 +383,48 @@
     color: #fff;
     box-shadow: 0 2px 8px rgba(37, 99, 235, .4);
   }
-  .enginfo {
+  .engstats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .engstats .st {
+    background: rgba(2, 6, 23, .45);
+    border: 1px solid rgba(148, 163, 184, .12);
+    border-radius: 8px;
+    padding: 4px 4px 5px;
+    text-align: center;
+  }
+  .engstats .st b {
+    display: block;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #e2e8f0;
+    white-space: nowrap;
+  }
+  .engstats .st span {
+    display: block;
+    font-size: 9px;
+    letter-spacing: .9px;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+  .engline {
     font-family: ui-monospace, Menlo, monospace;
     font-size: 11.5px;
-    color: #94a3b8;
-    word-break: break-all;
-    margin-top: 7px;
-    padding-top: 7px;
+    color: #93c5fd;
+    margin-top: 5px;
+    padding-top: 6px;
     border-top: 1px dashed rgba(148, 163, 184, .18);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .enginfo:empty { display: none; }
+  .engline:empty { display: none; }
   .strength-row { display: none; }
   .strength-row.visible { display: block; }
   .mini-label {
@@ -555,7 +587,15 @@
     <div class="card">
       <div class="card-h">Status <span class="right" id="setupMeta"></span></div>
       <div class="status" id="status"></div>
-      <div class="enginfo" id="engInfo"></div>
+      <div class="engstats" id="engStats">
+        <div class="st"><b id="stDepth">–</b><span>depth</span></div>
+        <div class="st"><b id="stEval">–</b><span>eval</span></div>
+        <div class="st"><b id="stNodes">–</b><span>nodes</span></div>
+        <div class="st"><b id="stSpeed">–</b><span>speed</span></div>
+        <div class="st"><b id="stTime">–</b><span>time</span></div>
+        <div class="st"><b id="stPv">–</b><span>pv plies</span></div>
+      </div>
+      <div class="engline" id="engPv"></div>
     </div>
 
     <div class="card">
@@ -2014,7 +2054,15 @@ const chipWEl  = document.getElementById("chipWhite");
 const chipBEl  = document.getElementById("chipBlack");
 const setupMetaEl = document.getElementById("setupMeta");
 const movesLastEl = document.getElementById("movesLast");
-const engInfoEl = document.getElementById("engInfo");
+const engStatsEls = {
+  depth: document.getElementById("stDepth"),
+  eval:  document.getElementById("stEval"),
+  nodes: document.getElementById("stNodes"),
+  speed: document.getElementById("stSpeed"),
+  time:  document.getElementById("stTime"),
+  pv:    document.getElementById("stPv"),
+};
+const engPvEl = document.getElementById("engPv");
 posKeys = [posKey()];
 
 /* --- engine (Web Worker built from the embedded source) --- */
@@ -2043,11 +2091,71 @@ function requestEngineMove() {
   thinking = true;
   reqId++;
   const lvl = LEVELS[levelIdx];
+  resetEngineStats();                // old line/stats are from a stale position
   ensureWorker().postMessage({ cmd: "search", id: reqId, moves: engineMoveList(),
                                thinkMs: lvl.thinkMs, maxDepth: lvl.maxDepth, noise: lvl.noise });
   render();
 }
 function whiteScoreOf(s) { return engineColor === "w" ? s : -s; }
+
+/* --- live engine line + stat grid --- */
+
+// Convert the engine's UCI pv (["e2e4","e7e5",…]) into numbered SAN by
+// replaying it on state clones with the controller's own move generator —
+// so what you see obeys the same rules as the board (disambiguation,
+// castling, check/mate marks). Stops silently if a move doesn't fit.
+const PV_PLIES = 10;
+
+function pvSanLine(pv) {
+  if (!pv || !pv.length) return "";
+  let cur = state;
+  const sans = [];
+  for (let i = 0; i < pv.length && i < PV_PLIES; i++) {
+    const u = pv[i];
+    if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(u)) break;
+    const ff = u.charCodeAt(0) - 97, fr = 8 - (u.charCodeAt(1) - 48);
+    const tf = u.charCodeAt(2) - 97, tr = 8 - (u.charCodeAt(3) - 48);
+    const promo = u.length > 4 ? u[4] : null;
+    const legal = legalMoves(cur);
+    const mv = legal.find(m =>
+      m.from[0] === fr && m.from[1] === ff &&
+      m.to[0] === tr && m.to[1] === tf &&
+      (m.promotion || null) === (promo || null));
+    if (!mv) break;
+    const after = makeMove(cur, mv);
+    sans.push(moveToSan(cur, mv, after, legal));
+    cur = after;
+  }
+  let s = "", no = Math.floor(history.length / 2) + 1;
+  let wtm = history.length % 2 === 0;
+  for (const san of sans) {
+    if (wtm) s += (s ? " " : "") + no + ". " + san;
+    else { s += (s ? " " : "") + no + "… " + san; no++; }
+    wtm = !wtm;
+  }
+  return s;
+}
+
+/* formatting for the engine stat grid */
+const fmtNodes = n =>
+  n >= 1e6 ? (n / 1e6).toFixed(1) + "M" :
+  n >= 1e3 ? (n / 1e3).toFixed(n < 1e4 ? 1 : 0) + "k" : String(n);
+const fmtSpeed = knps => knps >= 1000 ? (knps / 1000).toFixed(1) + "M/s" : knps + "k/s";
+const fmtTime = ms => (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + "s";
+
+function resetEngineStats() {
+  for (const el of Object.values(engStatsEls)) el.textContent = "–";
+  engPvEl.textContent = "";
+}
+
+function setEngineStats(d) {
+  engStatsEls.depth.textContent = d.depth !== undefined ? d.depth : "–";
+  engStatsEls.eval.textContent  = d.score !== undefined ? fmtScore(whiteScoreOf(d.score)) : "–";
+  engStatsEls.nodes.textContent = d.nodes !== undefined ? fmtNodes(d.nodes) : "–";
+  engStatsEls.speed.textContent = d.knps !== undefined ? fmtSpeed(d.knps) : "–";
+  engStatsEls.time.textContent  = d.time !== undefined ? fmtTime(d.time) : "–";
+  engStatsEls.pv.textContent    = d.pvLen !== undefined ? d.pvLen : "–";
+}
 
 /* --- eval bar --- */
 
@@ -2083,16 +2191,23 @@ function onEngineMsg(e) {
   const msg = e.data;
   if (msg.cmd === "info" && msg.id === reqId && thinking) {
     evalWhiteCp = whiteScoreOf(msg.score);
-    const knps = Math.round(msg.nodes / Math.max(msg.time, 1));
-    engInfoEl.textContent =
-      `depth ${msg.depth} · ${fmtScore(whiteScoreOf(msg.score))} · ${knps}k n/s` +
-      (msg.pv && msg.pv.length ? ` · ${msg.pv.slice(0, 6).join(" ")}` : "");
+    setEngineStats({
+      depth: msg.depth,
+      score: msg.score,
+      nodes: msg.nodes,
+      knps: Math.round(msg.nodes / Math.max(msg.time, 1)),
+      time: msg.time,
+      pvLen: msg.pv ? msg.pv.length : 0,
+    });
+    const line = pvSanLine(msg.pv);
+    engPvEl.textContent = line ? "▶ " + line : "";
     updateEvalBar();
   }
   if (msg.cmd === "best" && msg.id === reqId && thinking) {
     thinking = false;
     if (!msg.move || gameOver) { render(); return; }
     evalWhiteCp = whiteScoreOf(msg.score);
+    setEngineStats({ depth: msg.depth, score: msg.score, nodes: msg.nodes });
     const from = [msg.from >> 3, msg.from & 7];
     const to = [msg.to >> 3, msg.to & 7];
     const promo = msg.promo ? PROMO_CHR[msg.promo] : null;
@@ -2726,7 +2841,7 @@ document.getElementById("newBtn").onclick = () => {
   gameOver = null;
   pendingPromo = null;
   evalWhiteCp = 0;
-  engInfoEl.textContent = "";
+  resetEngineStats();
   chatReset();
   render();
   if (engineColor && state.turn === engineColor) requestEngineMove();
@@ -2742,7 +2857,7 @@ document.getElementById("undoBtn").onclick = () => {
   selected = null;
   currentLegal = [];
   gameOver = null;
-  engInfoEl.textContent = "";
+  resetEngineStats();
   render();
   if (engineColor && !gameOver && state.turn === engineColor) requestEngineMove();
 };
@@ -2777,7 +2892,7 @@ document.getElementById("modeRow").addEventListener("click", e => {
   if (newColor === engineColor) return;
   if (thinking) stopEngine();
   engineColor = newColor;
-  engInfoEl.textContent = "";
+  resetEngineStats();
   document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b === btn));
   strengthRow.classList.toggle("visible", !!engineColor);
   if (engineColor && !gameOver && state.turn === engineColor) requestEngineMove();

@@ -189,6 +189,19 @@ request it sends the **full move list**; the engine replays it from
   in the button row; state persists as `chessSound`. Alternative packs
   (Classic Wood with a noise "thock", Modern Click, Retro 8-bit,
   Cinematic) live in `chess/sounds.html` for preview.
+- **Live engine line + stat grid**: engine progress is shown in a 3×2
+  `.engstats` grid (`engStatsEls`: depth, eval, nodes, speed, time,
+  pv plies) plus the SAN line `.engline` (`engPvEl`). `setEngineStats()`
+  fills the cells from `info` messages (formatted by `fmtNodes`/
+  `fmtSpeed`/`fmtTime`; `best` finalizes depth/eval/nodes — it carries no
+  time, so speed/time keep the last `info` values). `pvSanLine(pv)`
+  converts the engine's UCI pv (["e2e4","e7e5",…]) by replaying up to
+  `PV_PLIES` (10) moves on state clones through
+  `legalMoves`/`makeMove`/`moveToSan` — same rules as the board, so
+  castling, disambiguation, and check/mate marks are correct. It breaks
+  silently on any unmatched move. Both are cleared via
+  `resetEngineStats()` when a new search starts, on New Game, on undo,
+  and on mode switch.
 - **Eval bar**: `.eval-bar` (in the board frame's left padding) holds
   `.eval-fill`, whose height = white's share from a sigmoid of
   `evalWhiteCp` (±1200 cp clamp; ±400 cp ≈ sigmoid midpoint scale).
