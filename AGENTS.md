@@ -118,7 +118,13 @@ request it sends the **full move list**; the engine replays it from
   snapshots for undo. Undo pops 2 ply when an engine is playing and it's
   not the engine's turn (so both sides undo), else 1 ply.
 - `render()` **rebuilds the whole board DOM** on every change — don't add
-  incremental DOM updates; keep the full-rebuild pattern.
+  incremental DOM updates; keep the full-rebuild pattern. Move animation
+  rides on top of it: `animateMove(m)` is called from `commit()` right
+  after `render()` and uses FLIP — the piece on the destination square
+  starts translated to its origin square, then transitions into place
+  (220 ms; the rook slides too on castling). Honors
+  `prefers-reduced-motion`. A `.animating` CSS class lifts the piece above
+  neighbors while in flight.
 - Game end checked in `evaluateGameEnd`: mate/stalemate via controller
   `legalMoves`, plus insufficient material, 50-move (`halfmove >= 100`),
   threefold repetition via string `posKeys` (independent from the engine's
@@ -172,15 +178,17 @@ request it sends the **full move list**; the engine replays it from
 - Unicode piece glyphs (`GLYPH`) are styled with CSS text-stroke
   (`.glyph-w` / `.glyph-b`) rather than images.
 - **Sound effects** (`/* --- sound effects (WebAudio, synthesized — no assets) --- */`
-  section): all sounds are synthesized at runtime — a filtered-noise
-  "thock" (`thock`) for piece landings plus oscillator blips (`tone`) for
-  capture/check/promote and game-end fanfares. `playMoveSound(m, san)` is
-  called from `commit()` **after** `evaluateGameEnd()`, so game-end
+  section): all sounds are synthesized at runtime — the "Soft Minimal"
+  pack of gentle sine pings (`tone` with sine oscillators only) for
+  move/capture/castle/check/promote and game-end fanfares. `playMoveSound(m, san)`
+  is called from `commit()` **after** `evaluateGameEnd()`, so game-end
   sounds take precedence over move sounds. The `AudioContext` is created
   lazily and unlocked on the first `pointerdown` (autoplay policy — engine
   moves have no gesture of their own). Mute toggle is the `soundBtn`
   (Feather-style monochrome SVG speaker injected via `drawSoundIcon()`)
-  in the button row; state persists as `chessSound`.
+  in the button row; state persists as `chessSound`. Alternative packs
+  (Classic Wood with a noise "thock", Modern Click, Retro 8-bit,
+  Cinematic) live in `chess/sounds.html` for preview.
 
 ## Verifying changes
 
