@@ -35,9 +35,11 @@ python3 -m http.server 8000
 The file has four parts, in order:
 
 1. **`<style>`** (lines ~7–416) — all CSS.
-2. **HTML markup** (lines ~419–478) — board container, side panel (card-based:
-   status / game setup with mode + strength / material / moves / buttons),
-   promotion overlay.
+2. **HTML markup** (lines ~419–500) — board container, main side panel
+   (card-based: status / game setup with mode + strength / material /
+   moves / buttons), a second `.chat-panel` column for the chat card,
+   promotion overlay. On narrow screens the chat panel wraps below the
+   main panel with a fixed-height log.
 3. **Engine source, as inert text** (lines ~481–1543) —
    `<script id="engine-src" type="text/plain">`. This is the engine.
    Because its type is `text/plain`, the browser does not execute it. The
@@ -129,6 +131,34 @@ request it sends the **full move list**; the engine replays it from
   play.
 - Persistence via `localStorage`: keys `chessStrength` and
   `chessBoardSize`.
+- **LLM chat** (`/* --- LLM opponent chat (OpenRouter) --- */` section): a
+  chat card where the user pastes an OpenRouter API key to talk with the
+  opponent. Key is session-only (`orKey` variable, never persisted). Calls
+  `POST https://openrouter.ai/api/v1/chat/completions` with model
+  `z-ai/glm-5.3-flash` directly from the controller via `fetch` — no
+  worker involvement. `glm-5.3-flash` has mandatory reasoning on
+  OpenRouter (cannot be disabled — `effort: "none"` is rejected with
+  HTTP 400), so requests use `reasoning: { effort: "minimal",
+  exclude: true }` and `max_tokens: 1024` so thinking tokens can't
+  starve the visible reply; an empty reply is retried once at 2048,
+  then dropped silently. Error bubbles include the
+  provider's message from the JSON error body. `gameContext()` feeds the LLM live
+  state (SAN move
+  list, turn, check, material, game-over). The opponent only speaks on
+  significant events (`describeMoveEvents`): captures (piece named),
+  promotions, checks — by either side — plus eval swings of
+  ≥ `CHAT_EVAL_SWING` centipawns (250) computed from the engine's `best`
+  score vs. the previous one (`lastWhiteEval`, white perspective, mate
+  scores clamped to ±5000), and game end (`chatAfterGameEnd`). Quiet
+  moves get no commentary; game-event triggers (`chatEvent`) no-op
+  unless a key is set and no request is in flight.
+  Requests are serialized through a promise chain (`chatQueue`); user
+  messages (`userSay`) abort any in-flight reply via an `AbortController`
+  (`chatAbort`) before queueing, so user input always interrupts banter
+  and is never lost. Aborted requests fail silently (no error bubble).
+  `chatReset()` clears the log on New Game. Chat bubbles are built with `textContent` (never
+  `innerHTML`) and appended incrementally — outside the `render()`
+  full-rebuild path.
 - Unicode piece glyphs (`GLYPH`) are styled with CSS text-stroke
   (`.glyph-w` / `.glyph-b`) rather than images.
 

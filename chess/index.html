@@ -154,7 +154,8 @@
 
   .panel {
     width: 320px;
-    align-self: stretch;
+    align-self: flex-start;
+    max-height: calc(100vh - 48px);
     background: rgba(15, 23, 42, .58);
     border: 1px solid rgba(148, 163, 184, .14);
     border-radius: 16px;
@@ -254,10 +255,10 @@
     padding: 2px 8px;
   }
   .chip.even { color: #94a3b8; background: rgba(148, 163, 184, .15); }
-  .moves-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .moves-card { flex: 1; display: flex; flex-direction: column; min-height: 120px; }
   .moves {
     flex: 1;
-    min-height: 130px;
+    min-height: 0;
     overflow-y: auto;
     font-family: ui-monospace, Menlo, monospace;
     font-size: 13px;
@@ -301,7 +302,6 @@
     display: flex; align-items: center; justify-content: center;
     z-index: 10;
   }
-  .overlay.hidden { display: none; }
   .modal {
     background: #1a2437;
     border: 1px solid rgba(148, 163, 184, .18);
@@ -410,8 +410,75 @@
     pointer-events: none;
   }
 
+  /* --- chat --- */
+  .hidden { display: none; }
+  .chat-panel { width: 300px; }
+  .chat-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .chat-card:has(.chat-body.hidden) { flex: none; }
+  .chat-setup { display: flex; flex-direction: column; gap: 8px; }
+  .chat-setup input, .chat-input-row input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #e2e8f0;
+    background: rgba(2, 6, 23, .45);
+    border: 1px solid rgba(148, 163, 184, .2);
+    border-radius: 8px;
+    outline: none;
+  }
+  .chat-setup input:focus, .chat-input-row input:focus { border-color: #3b82f6; }
+  .chat-hint { font-size: 11px; color: #64748b; }
+  .chat-body { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .chat-log {
+    flex: 1;
+    min-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 2px;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+  }
+  .chat-log::-webkit-scrollbar { width: 8px; }
+  .chat-log::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  .msg {
+    max-width: 88%;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .msg.opp {
+    align-self: flex-start;
+    background: rgba(51, 65, 85, .8);
+    border: 1px solid rgba(148, 163, 184, .16);
+    border-bottom-left-radius: 3px;
+  }
+  .msg.you {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-bottom-right-radius: 3px;
+  }
+  .msg.sys {
+    align-self: center;
+    background: none;
+    color: #64748b;
+    font-size: 11.5px;
+    font-style: italic;
+    text-align: center;
+  }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input-row input { flex: 1; }
+  .chat-input-row button { flex: none; padding: 8px 14px; font-size: 13px; }
+
   @media (max-width: 720px) {
     .panel { width: min(92vw, 500px); order: 2; }
+    .chat-panel { align-self: auto; }
+    .chat-card { flex: none; }
+    .chat-log { flex: none; height: 200px; }
   }
 </style>
 </head>
@@ -465,6 +532,24 @@
       <div class="row2">
         <button id="undoBtn" class="secondary">Undo</button>
         <button id="flipBtn" class="secondary">Flip</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel chat-panel">
+    <div class="card chat-card">
+      <div class="card-h">Chat <span class="right" id="chatMeta"></span></div>
+      <div class="chat-setup" id="chatSetup">
+        <input type="password" id="apiKeyInput" placeholder="OpenRouter API key (sk-or-…)" autocomplete="off">
+        <button id="chatEnableBtn">Enable chat</button>
+        <div class="chat-hint">Key is kept in memory only, never stored.</div>
+      </div>
+      <div class="chat-body hidden" id="chatBody">
+        <div class="chat-log" id="chatLog"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Talk to your opponent…" maxlength="500">
+          <button id="chatSendBtn">Send</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1910,7 +1995,16 @@ function onEngineMsg(e) {
       m.from[0] === from[0] && m.from[1] === from[1] &&
       m.to[0] === to[0] && m.to[1] === to[1] &&
       (m.promotion || null) === promo);
-    if (mv) commit(mv);
+    if (mv) {
+      const boardBefore = state.board;
+      const w = whiteScoreOf(msg.score);
+      const wc = Math.max(-5000, Math.min(5000, w));   // clamp mate scores
+      const swing = lastWhiteEval === null ? 0 : wc - lastWhiteEval;
+      lastWhiteEval = wc;
+      commit(mv);
+      const san = history.length ? history[history.length - 1].san : "";
+      chatAfterEngineMove(boardBefore, mv, san, swing, w);
+    }
     else { console.error("engine move rejected", msg); render(); }
   }
 }
@@ -2126,6 +2220,8 @@ function commit(m) {
   posKeys.push(posKey(after));
   evaluateGameEnd();
   render();
+  if (gameOver) chatAfterGameEnd();
+  else if (m.color !== engineColor) chatAfterHumanMove(before.board, m, san);
   if (!gameOver && engineColor && state.turn === engineColor) requestEngineMove();
 }
 
@@ -2151,6 +2247,228 @@ function evaluateGameEnd() {
   }
 }
 
+/* --- LLM opponent chat (OpenRouter) --- */
+
+const CHAT_MODEL = "z-ai/glm-5.3-flash";
+const CHAT_MAX_TURNS = 12;         // user/assistant pairs kept in context
+const CHAT_EVAL_SWING = 250;       // centipawn swing (white perspective) that counts as "big"
+const PIECE_NAME = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
+let orKey = null;                  // session-only API key, never persisted
+let chatBusy = false;
+let chatAbort = null;              // AbortController of the in-flight request
+let chatQueue = Promise.resolve(); // serializes requests so none are lost
+let chatHistory = [];              // [{role:'user'|'assistant', content}]
+let lastWhiteEval = null;          // engine eval (cp, white perspective) after its last move
+
+const chatSetupEl = document.getElementById("chatSetup");
+const chatBodyEl  = document.getElementById("chatBody");
+const chatLogEl   = document.getElementById("chatLog");
+const chatMetaEl  = document.getElementById("chatMeta");
+const apiKeyEl    = document.getElementById("apiKeyInput");
+const chatInputEl = document.getElementById("chatInput");
+
+function addChatBubble(cls, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.textContent = text;
+  chatLogEl.appendChild(d);
+  chatLogEl.scrollTop = chatLogEl.scrollHeight;
+  return d;
+}
+
+function sanMoveList() {
+  let s = "";
+  for (let i = 0; i < history.length; i += 2) {
+    s += `${i / 2 + 1}. ${history[i].san}`;
+    if (i + 1 < history.length) s += ` ${history[i + 1].san}`;
+    s += "  ";
+  }
+  return s.trim();
+}
+
+function gameContext() {
+  const caps = capturedPieces();
+  const VAL = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  const mat = o => Object.entries(o).reduce((s, [t, n]) => s + VAL[t] * n, 0);
+  const adv = mat(caps.byWhite) - mat(caps.byBlack);
+  const myColor = engineColor === "w" ? "White" : "Black";
+  let ctx = `You play ${myColor} (strength: ${LEVELS[levelIdx].name}). ` +
+    `Moves so far: ${sanMoveList() || "none yet"}. ` +
+    `${state.turn === "w" ? "White" : "Black"} to move` +
+    `${inCheck(state, state.turn) ? " (in check)" : ""}. ` +
+    `Material: ${adv > 0 ? "White +" + adv : adv < 0 ? "Black +" + (-adv) : "level"}.`;
+  if (gameOver) {
+    ctx += ` Game over: ${gameOver.result === "draw" ? "draw" :
+      (gameOver.result === "w" ? "White" : "Black") + " wins"} by ${gameOver.reason}.`;
+  }
+  return ctx;
+}
+
+function systemPrompt(event) {
+  return "You are the user's chess opponent in a casual online game — the moves on " +
+    "your side are chosen by a chess engine, but your personality and words are yours. " +
+    gameContext() + (event ? ` Recent event: ${event}` : "") +
+    " Respond in 1-3 short sentences, in character: confident, playful, light trash-talk " +
+    "is welcome. Reference the actual moves or position when relevant. Never break " +
+    "character, never mention being an AI or a language model, and don't give move " +
+    "advice unless asked.";
+}
+
+function queueChat(userText, event) {
+  chatQueue = chatQueue.then(() => doChat(userText, event));
+}
+
+async function chatRequest(msgs, maxTokens, signal) {
+  // Note: glm-5.3-flash has mandatory reasoning ("cannot be disabled"),
+  // so we use minimal effort + exclude, and a budget big enough to
+  // leave room for content after thinking tokens.
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json",
+               "Authorization": `Bearer ${orKey}` },
+    body: JSON.stringify({ model: CHAT_MODEL, messages: msgs,
+                           max_tokens: maxTokens, temperature: 0.8,
+                           reasoning: { effort: "minimal", exclude: true } }),
+    signal,
+  });
+  if (res.status === 401) {
+    disableChat("API key rejected (401). Re-enter a valid OpenRouter key.");
+    return null;
+  }
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).error.message || ""; } catch (e) {}
+    throw new Error(`HTTP ${res.status}${detail ? " — " + detail : ""}`);
+  }
+  const data = await res.json();
+  const msg = data.choices && data.choices[0] && data.choices[0].message;
+  return ((msg && msg.content) || "").trim();
+}
+
+async function doChat(userText, event) {
+  if (!orKey) return;
+  chatBusy = true;
+  const aborter = chatAbort = new AbortController();
+  const typing = addChatBubble("opp", "");
+  typing.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>`;
+  try {
+    const msgs = [{ role: "system", content: systemPrompt(event) },
+                  ...chatHistory.slice(-CHAT_MAX_TURNS * 2),
+                  { role: "user", content: userText || `[game event] ${event}` }];
+    let reply = await chatRequest(msgs, 1024, aborter.signal);
+    if (reply === null) { typing.remove(); return; }   // 401, chat disabled
+    if (!reply)          // empty: retry once with a bigger budget
+      reply = await chatRequest(msgs, 2048, aborter.signal);
+    typing.remove();
+    if (!reply) return;  // still empty: drop silently
+    addChatBubble("opp", reply);
+    chatHistory.push({ role: "user", content: userText || `[game event] ${event}` },
+                     { role: "assistant", content: reply });
+    if (chatHistory.length > CHAT_MAX_TURNS * 2)
+      chatHistory = chatHistory.slice(-CHAT_MAX_TURNS * 2);
+  } catch (err) {
+    typing.remove();
+    if (err.name !== "AbortError")   // aborted = user interrupted; stay silent
+      addChatBubble("sys", `Chat error: ${err.message}`);
+  } finally {
+    chatBusy = false;
+    if (chatAbort === aborter) chatAbort = null;
+  }
+}
+
+function disableChat(reason) {
+  orKey = null;
+  chatHistory = [];
+  chatBodyEl.classList.add("hidden");
+  chatSetupEl.classList.remove("hidden");
+  chatMetaEl.textContent = "";
+  if (reason) addChatBubble("sys", reason);
+}
+
+// User messages take precedence: abort any reply being generated, then
+// send (queued, so rapid successive messages are all delivered).
+function userSay(text) {
+  if (!orKey) return;
+  addChatBubble("you", text);
+  if (chatBusy && chatAbort) chatAbort.abort();
+  queueChat(text, null);
+}
+
+// Event hooks — all no-ops unless chat is enabled and idle.
+function chatEvent(event) {
+  if (orKey && !chatBusy) queueChat(null, event);
+}
+
+// The opponent only speaks up about significant events; quiet moves stay quiet.
+function describeMoveEvents(beforeBoard, m, san, who) {
+  const events = [];
+  const capSq = m.epCapture || m.to;
+  const cap = beforeBoard[capSq[0]][capSq[1]];
+  if (cap) events.push(`${who} captured a ${PIECE_NAME[cap.t]} (${san})`);
+  if (m.promotion) events.push(`${who} promoted a pawn to a ${PIECE_NAME[m.promotion]} (${san})`);
+  if (san.endsWith("+")) events.push(`${who} gave check (${san})`);
+  return events;
+}
+
+function chatAfterHumanMove(beforeBoard, m, san) {
+  if (!orKey || chatBusy || gameOver) return;
+  const events = describeMoveEvents(beforeBoard, m, san, "Your opponent (the human)");
+  if (events.length) chatEvent(events.join(". ") + ". React to it in character.");
+}
+
+function chatAfterEngineMove(beforeBoard, m, san, swing, whiteEval) {
+  if (!orKey || chatBusy || gameOver) return;
+  const events = describeMoveEvents(beforeBoard, m, san, "You");
+  if (Math.abs(swing) >= CHAT_EVAL_SWING)
+    events.push(`the evaluation swung ${(Math.abs(swing) / 100).toFixed(1)} pawns in ` +
+                `${swing > 0 ? "White" : "Black"}'s favor (now ${fmtScore(whiteEval)})`);
+  if (events.length) chatEvent(events.join(". ") + ". React to it in character.");
+}
+
+function chatAfterGameEnd() {
+  if (!orKey || chatBusy) return;
+  const res = gameOver.result === "draw" ? "a draw"
+    : (gameOver.result === engineColor ? "your victory" : "your loss");
+  chatEvent(`The game just ended: ${res} by ${gameOver.reason}. React in character (graceful or salty).`);
+}
+
+function chatReset() {
+  chatHistory = [];
+  lastWhiteEval = null;
+  chatLogEl.innerHTML = "";
+}
+
+document.getElementById("chatEnableBtn").onclick = () => {
+  const key = apiKeyEl.value.trim();
+  if (!key.startsWith("sk-")) {
+    addChatBubble("sys", "That doesn't look like an OpenRouter key (should start with sk-).");
+    chatSetupEl.classList.add("hidden");
+    chatBodyEl.classList.remove("hidden");
+    setTimeout(() => { chatBodyEl.classList.add("hidden"); chatSetupEl.classList.remove("hidden"); }, 1500);
+    return;
+  }
+  orKey = key;
+  apiKeyEl.value = "";
+  chatSetupEl.classList.add("hidden");
+  chatBodyEl.classList.remove("hidden");
+  chatMetaEl.textContent = CHAT_MODEL.split("/")[1];
+  chatReset();
+  queueChat(null, "The game is starting. Greet your opponent in character.");
+};
+chatInputEl.addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const t = chatInputEl.value.trim();
+  if (!t) return;
+  chatInputEl.value = "";
+  userSay(t);
+});
+document.getElementById("chatSendBtn").onclick = () => {
+  const t = chatInputEl.value.trim();
+  if (!t) return;
+  chatInputEl.value = "";
+  userSay(t);
+};
+
 /* --- buttons --- */
 
 document.getElementById("newBtn").onclick = () => {
@@ -2163,6 +2481,7 @@ document.getElementById("newBtn").onclick = () => {
   gameOver = null;
   pendingPromo = null;
   engInfoEl.textContent = "";
+  chatReset();
   render();
   if (engineColor && state.turn === engineColor) requestEngineMove();
 };
