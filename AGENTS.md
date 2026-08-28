@@ -39,7 +39,9 @@ The file has four parts, in order:
    (card-based: status / game setup with mode + strength / material /
    moves / buttons), a second `.chat-panel` column for the chat card,
    promotion overlay. On narrow screens the chat panel wraps below the
-   main panel with a fixed-height log.
+   main panel with a fixed-height log. The moves list is capped at
+   `max-height: 260px` on `.moves` and scrolls internally; `renderMoves()`
+   auto-scrolls it to the latest move.
 3. **Engine source, as inert text** (lines ~481–1543) —
    `<script id="engine-src" type="text/plain">`. This is the engine.
    Because its type is `text/plain`, the browser does not execute it. The
