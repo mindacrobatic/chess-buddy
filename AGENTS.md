@@ -156,7 +156,17 @@ request it sends the **full move list**; the engine replays it from
   messages (`userSay`) abort any in-flight reply via an `AbortController`
   (`chatAbort`) before queueing, so user input always interrupts banter
   and is never lost. Aborted requests fail silently (no error bubble).
-  `chatReset()` clears the log on New Game. Chat bubbles are built with `textContent` (never
+  `chatReset()` clears the log on New Game. Chat can be disabled again via a
+  Disable button in the chat card header (`chatDisableBtn` → `disableChat()`),
+  which aborts any in-flight request, hides the body, and shows the setup view
+  again; status messages (bad key, disabled, 401) appear in a notice line
+  (`chatNotice`) inside the setup view — never in the log, which is hidden
+  while setup is shown. An "Opponent language" dropdown (`chatLang`, 16
+  languages) sets the language the opponent replies in: `systemPrompt()`
+  appends "Always respond in <language>", and the choice is persisted to
+  localStorage (`chessChatLang`); switching it mid-game queues a chat event so
+  the opponent acknowledges and switches immediately. Chat bubbles are built
+  with `textContent` (never
   `innerHTML`) and appended incrementally — outside the `render()`
   full-rebuild path.
 - Unicode piece glyphs (`GLYPH`) are styled with CSS text-stroke
