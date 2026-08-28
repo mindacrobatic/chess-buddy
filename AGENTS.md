@@ -129,8 +129,8 @@ request it sends the **full move list**; the engine replays it from
   noise), Okayish (800 ms, depth 5, ±20 noise), Boss (2000 ms, depth 99,
   no noise). Noise = random uniform perturbation of root scores to weaken
   play.
-- Persistence via `localStorage`: keys `chessStrength` and
-  `chessBoardSize`.
+- Persistence via `localStorage`: keys `chessStrength`,
+  `chessBoardSize`, and `chessSound`.
 - **LLM chat** (`/* --- LLM opponent chat (OpenRouter) --- */` section): a
   chat card where the user pastes an OpenRouter API key to talk with the
   opponent. Key is session-only (`orKey` variable, never persisted). Calls
@@ -171,6 +171,16 @@ request it sends the **full move list**; the engine replays it from
   full-rebuild path.
 - Unicode piece glyphs (`GLYPH`) are styled with CSS text-stroke
   (`.glyph-w` / `.glyph-b`) rather than images.
+- **Sound effects** (`/* --- sound effects (WebAudio, synthesized — no assets) --- */`
+  section): all sounds are synthesized at runtime — a filtered-noise
+  "thock" (`thock`) for piece landings plus oscillator blips (`tone`) for
+  capture/check/promote and game-end fanfares. `playMoveSound(m, san)` is
+  called from `commit()` **after** `evaluateGameEnd()`, so game-end
+  sounds take precedence over move sounds. The `AudioContext` is created
+  lazily and unlocked on the first `pointerdown` (autoplay policy — engine
+  moves have no gesture of their own). Mute toggle is the `soundBtn`
+  (Feather-style monochrome SVG speaker injected via `drawSoundIcon()`)
+  in the button row; state persists as `chessSound`.
 
 ## Verifying changes
 

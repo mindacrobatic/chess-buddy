@@ -273,6 +273,7 @@
   .mrow .mv.last { color: #93c5fd; font-weight: 700; }
   .btns { display: flex; flex-direction: column; gap: 8px; }
   .btns .row2 { display: flex; gap: 8px; }
+  #soundBtn svg { width: 17px; height: 17px; vertical-align: -3px; }
   button {
     flex: 1;
     padding: 10px;
@@ -565,6 +566,7 @@
       <div class="row2">
         <button id="undoBtn" class="secondary">Undo</button>
         <button id="flipBtn" class="secondary">Flip</button>
+        <button id="soundBtn" class="secondary" title="Toggle sound effects" aria-label="Toggle sound effects"></button>
       </div>
     </div>
   </div>
@@ -2272,6 +2274,7 @@ function commit(m) {
 
   posKeys.push(posKey(after));
   evaluateGameEnd();
+  playMoveSound(m, san);
   render();
   if (gameOver) chatAfterGameEnd();
   else if (m.color !== engineColor) chatAfterHumanMove(before.board, m, san);
@@ -2549,6 +2552,94 @@ document.getElementById("chatSendBtn").onclick = () => {
   userSay(t);
 };
 
+/* --- sound effects (WebAudio, synthesized — no assets) --- */
+
+let audioCtx = null;
+let soundOn = true;
+try { soundOn = localStorage.getItem("chessSound") !== "off"; } catch (e) {}
+
+function ensureAudio() {
+  if (!soundOn) return null;
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { return null; }
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+// Browsers block audio until a user gesture; unlock the context on the
+// first click/tap anywhere (engine moves have no gesture of their own).
+window.addEventListener("pointerdown", () => { if (soundOn) ensureAudio(); }, { once: true });
+
+function tone(freq, dur, opts = {}) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const t0 = ctx.currentTime + (opts.at || 0);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = opts.type || "sine";
+  osc.frequency.setValueAtTime(freq, t0);
+  if (opts.slide) osc.frequency.exponentialRampToValueAtTime(opts.slide, t0 + dur);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(opts.vol || 0.12, t0 + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.05);
+}
+
+// Filtered noise burst — the wooden "thock" of a piece landing.
+function thock(vol, at, cutoff, dur) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const t0 = ctx.currentTime + (at || 0);
+  const len = Math.floor(ctx.sampleRate * (dur || 0.09));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++)
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.value = cutoff || 800;
+  const gain = ctx.createGain();
+  gain.gain.value = vol;
+  src.connect(filt).connect(gain).connect(ctx.destination);
+  src.start(t0);
+}
+
+const SFX = {
+  move()    { thock(0.5, 0, 750); tone(190, 0.07, { type: "triangle", vol: 0.05 }); },
+  capture() { thock(0.7, 0, 1400, 0.12); tone(150, 0.12, { type: "square", vol: 0.05, slide: 90 }); },
+  castle()  { thock(0.4, 0, 700); thock(0.55, 0.09, 750); },
+  check()   { tone(880, 0.09, { type: "square", vol: 0.07 });
+              tone(1175, 0.14, { type: "square", vol: 0.07, at: 0.09 }); },
+  promote() { [523, 659, 784].forEach((f, i) =>
+                tone(f, 0.12, { type: "triangle", vol: 0.09, at: i * 0.08 })); },
+  win()     { [523, 659, 784, 1047].forEach((f, i) =>
+                tone(f, 0.18, { type: "triangle", vol: 0.11, at: i * 0.11 })); },
+  lose()    { [392, 330, 262].forEach((f, i) =>
+                tone(f, 0.25, { type: "sine", vol: 0.11, at: i * 0.14 })); },
+  draw()    { tone(440, 0.2, { type: "sine", vol: 0.09 });
+              tone(440, 0.3, { type: "sine", vol: 0.08, at: 0.24 }); },
+};
+
+// Called from commit() after evaluateGameEnd(), so gameOver is current.
+function playMoveSound(m, san) {
+  if (gameOver) {
+    if (gameOver.result === "draw") SFX.draw();
+    else SFX[gameOver.result === engineColor ? "lose" : "win"]();
+    return;
+  }
+  if (m.promotion) SFX.promote();
+  else if (m.rookFrom) SFX.castle();
+  else if (m.captured || m.epCapture) SFX.capture();
+  else SFX.move();
+  if (san.endsWith("+")) SFX.check();
+}
+
 /* --- buttons --- */
 
 document.getElementById("newBtn").onclick = () => {
@@ -2584,6 +2675,24 @@ document.getElementById("undoBtn").onclick = () => {
 document.getElementById("flipBtn").onclick = () => {
   flipped = !flipped;
   render();
+};
+
+const soundBtn = document.getElementById("soundBtn");
+// Feather-style monochrome icons; use currentColor so they inherit the
+// button's text color and stay crisp at any size (no emoji color clash).
+const SOUND_ON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const SOUND_OFF_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="17" y2="14"/><line x1="17" y1="9" x2="22" y2="14"/></svg>';
+function drawSoundIcon() {
+  soundBtn.innerHTML = soundOn ? SOUND_ON_SVG : SOUND_OFF_SVG;
+  soundBtn.title = soundOn ? "Sound on (click to mute)" : "Sound off (click to unmute)";
+  soundBtn.setAttribute("aria-label", soundBtn.title);
+}
+drawSoundIcon();
+soundBtn.onclick = () => {
+  soundOn = !soundOn;
+  try { localStorage.setItem("chessSound", soundOn ? "on" : "off"); } catch (e) {}
+  drawSoundIcon();
+  if (soundOn) SFX.move();   // audible confirmation it's back on
 };
 
 document.getElementById("modeRow").addEventListener("click", e => {
