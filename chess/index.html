@@ -416,15 +416,24 @@
   .engline {
     font-family: ui-monospace, Menlo, monospace;
     font-size: 11.5px;
-    color: #93c5fd;
+    color: #cbd5e1;
     margin-top: 5px;
     padding-top: 6px;
     border-top: 1px dashed rgba(148, 163, 184, .18);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.55;
+    max-height: 74px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+    word-break: break-word;
   }
   .engline:empty { display: none; }
+  .engline .n { color: #64748b; }
+  .engline .mv { color: #cbd5e1; }
+  .engline .mv.first { color: #93c5fd; font-weight: 700; }
+  .engline .pv-arrow { color: #64748b; }
+  .engline.stale { opacity: .45; }
+  .engline { transition: opacity .25s ease; }
   .strength-row { display: none; }
   .strength-row.visible { display: block; }
   .mini-label {
@@ -2091,7 +2100,9 @@ function requestEngineMove() {
   thinking = true;
   reqId++;
   const lvl = LEVELS[levelIdx];
-  resetEngineStats();                // old line/stats are from a stale position
+  // Keep the previous line visible (dimmed) until the first info of the
+  // new search replaces it — the old plan stays readable after the move.
+  engPvEl.classList.add("stale");
   ensureWorker().postMessage({ cmd: "search", id: reqId, moves: engineMoveList(),
                                thinkMs: lvl.thinkMs, maxDepth: lvl.maxDepth, noise: lvl.noise });
   render();
@@ -2100,14 +2111,16 @@ function whiteScoreOf(s) { return engineColor === "w" ? s : -s; }
 
 /* --- live engine line + stat grid --- */
 
-// Convert the engine's UCI pv (["e2e4","e7e5",…]) into numbered SAN by
-// replaying it on state clones with the controller's own move generator —
-// so what you see obeys the same rules as the board (disambiguation,
-// castling, check/mate marks). Stops silently if a move doesn't fit.
-const PV_PLIES = 10;
+// Convert the engine's UCI pv (["e2e4","e7e5",…]) into numbered SAN and
+// render it as styled spans in the .engline box — built with DOM nodes
+// (never innerHTML), same rules as the board (disambiguation, castling,
+// check/mate marks). Stops silently if a move doesn't fit. The engine
+// extracts up to 20 plies (Math.min(d, 20)); we mirror that.
+const PV_PLIES = 20;
 
-function pvSanLine(pv) {
-  if (!pv || !pv.length) return "";
+function renderPvLine(pv) {
+  engPvEl.textContent = "";
+  if (!pv || !pv.length) return;
   let cur = state;
   const sans = [];
   for (let i = 0; i < pv.length && i < PV_PLIES; i++) {
@@ -2126,14 +2139,25 @@ function pvSanLine(pv) {
     sans.push(moveToSan(cur, mv, after, legal));
     cur = after;
   }
-  let s = "", no = Math.floor(history.length / 2) + 1;
+  if (!sans.length) return;
+  const arrow = document.createElement("span");
+  arrow.className = "pv-arrow";
+  arrow.textContent = "▶ ";
+  engPvEl.appendChild(arrow);
+  let no = Math.floor(history.length / 2) + 1;
   let wtm = history.length % 2 === 0;
-  for (const san of sans) {
-    if (wtm) s += (s ? " " : "") + no + ". " + san;
-    else { s += (s ? " " : "") + no + "… " + san; no++; }
+  sans.forEach((san, i) => {
+    const num = document.createElement("span");
+    num.className = "n";
+    num.textContent = wtm ? no + ". " : no + "… ";
+    const mv = document.createElement("span");
+    mv.className = "mv" + (i === 0 ? " first" : "");
+    mv.textContent = san + " ";
+    engPvEl.append(num, mv);
+    if (!wtm) no++;
     wtm = !wtm;
-  }
-  return s;
+  });
+  engPvEl.title = engPvEl.textContent;   // full line on hover
 }
 
 /* formatting for the engine stat grid */
@@ -2199,8 +2223,9 @@ function onEngineMsg(e) {
       time: msg.time,
       pvLen: msg.pv ? msg.pv.length : 0,
     });
-    const line = pvSanLine(msg.pv);
-    engPvEl.textContent = line ? "▶ " + line : "";
+    renderPvLine(msg.pv);
+    engPvEl.classList.remove("stale");
+    updateEvalBar();
     updateEvalBar();
   }
   if (msg.cmd === "best" && msg.id === reqId && thinking) {

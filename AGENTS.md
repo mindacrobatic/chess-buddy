@@ -194,14 +194,19 @@ request it sends the **full move list**; the engine replays it from
   pv plies) plus the SAN line `.engline` (`engPvEl`). `setEngineStats()`
   fills the cells from `info` messages (formatted by `fmtNodes`/
   `fmtSpeed`/`fmtTime`; `best` finalizes depth/eval/nodes — it carries no
-  time, so speed/time keep the last `info` values). `pvSanLine(pv)`
+  time, so speed/time keep the last `info` values). `renderPvLine(pv)`
   converts the engine's UCI pv (["e2e4","e7e5",…]) by replaying up to
-  `PV_PLIES` (10) moves on state clones through
+  `PV_PLIES` (20 — mirrors the engine's `extractPV` cap of
+  `Math.min(d, 20)`) moves on state clones through
   `legalMoves`/`makeMove`/`moveToSan` — same rules as the board, so
   castling, disambiguation, and check/mate marks are correct. It breaks
-  silently on any unmatched move. Both are cleared via
-  `resetEngineStats()` when a new search starts, on New Game, on undo,
-  and on mode switch.
+  silently on any unmatched move. The line renders as DOM spans (never
+  innerHTML): dim move numbers, the engine's next move highlighted, wraps
+  in a ~74px scrollable box, full text duplicated into the hover tooltip.
+  The line **persists after the engine moves**: when the next search
+  starts it is only dimmed (`.engline.stale`, 45% opacity) until the
+  first `info` message replaces it — it is fully cleared only on New
+  Game, undo, and mode switch (via `resetEngineStats()`).
 - **Eval bar**: `.eval-bar` (in the board frame's left padding) holds
   `.eval-fill`, whose height = white's share from a sigmoid of
   `evalWhiteCp` (±1200 cp clamp; ±400 cp ≈ sigmoid midpoint scale).
