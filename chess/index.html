@@ -2251,7 +2251,7 @@ function evaluateGameEnd() {
 
 const CHAT_MODEL = "z-ai/glm-5.3-flash";
 const CHAT_MAX_TURNS = 12;         // user/assistant pairs kept in context
-const CHAT_EVAL_SWING = 250;       // centipawn swing (white perspective) that counts as "big"
+const CHAT_EVAL_SWING = 150;       // centipawn swing (white perspective) that counts as "big"
 const PIECE_NAME = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
 let orKey = null;                  // session-only API key, never persisted
 let chatBusy = false;

@@ -147,7 +147,7 @@ request it sends the **full move list**; the engine replays it from
   list, turn, check, material, game-over). The opponent only speaks on
   significant events (`describeMoveEvents`): captures (piece named),
   promotions, checks — by either side — plus eval swings of
-  ≥ `CHAT_EVAL_SWING` centipawns (250) computed from the engine's `best`
+  ≥ `CHAT_EVAL_SWING` centipawns (150) computed from the engine's `best`
   score vs. the previous one (`lastWhiteEval`, white perspective, mate
   scores clamped to ±5000), and game end (`chatAfterGameEnd`). Quiet
   moves get no commentary; game-event triggers (`chatEvent`) no-op
