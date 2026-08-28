@@ -434,6 +434,17 @@
   .engline .pv-arrow { color: #64748b; }
   .engline.stale { opacity: .45; }
   .engline { transition: opacity .25s ease; }
+  .opening-tag {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: #93c5fd;
+    background: rgba(59, 130, 246, .10);
+    border: 1px solid rgba(59, 130, 246, .28);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .opening-tag:empty { display: none; }
   .strength-row { display: none; }
   .strength-row.visible { display: block; }
   .mini-label {
@@ -596,6 +607,7 @@
     <div class="card">
       <div class="card-h">Status <span class="right" id="setupMeta"></span></div>
       <div class="status" id="status"></div>
+      <div class="opening-tag" id="openingTag"></div>
       <div class="engstats" id="engStats">
         <div class="st"><b id="stDepth">–</b><span>depth</span></div>
         <div class="st"><b id="stEval">–</b><span>eval</span></div>
@@ -2062,6 +2074,7 @@ const capBEl   = document.getElementById("capByBlack");
 const chipWEl  = document.getElementById("chipWhite");
 const chipBEl  = document.getElementById("chipBlack");
 const setupMetaEl = document.getElementById("setupMeta");
+const openingTagEl = document.getElementById("openingTag");
 const movesLastEl = document.getElementById("movesLast");
 const engStatsEls = {
   depth: document.getElementById("stDepth"),
@@ -2297,12 +2310,219 @@ function renderMoves() {
 }
 const escSan = s => s.replace(/</g, "&lt;");
 
+/* --- opening names --- */
+
+// Compact ECO book, one entry per line: "SAN moves|ECO|Name" (ECO may be
+// empty). Matched by longest prefix against the game's SAN history —
+// `+`/`#` are stripped from both sides and castling is "O-O"/"O-O-O",
+// matching moveToSan's output. ECO codes are approximate at variation
+// level; names are the meaningful part.
+const OPENING_BOOK = `
+e4|B00|King's Pawn Opening
+e4 e5|C20|Open Game
+e4 e5 Nf3|C40|King's Knight Opening
+e4 e5 Nf3 Nc6 Bc4|C50|Italian Game
+e4 e5 Nf3 Nc6 Bc4 Be7|C50|Hungarian Defense
+e4 e5 Nf3 Nc6 Bc4 Bc5|C50|Giuoco Piano
+e4 e5 Nf3 Nc6 Bc4 Bc5 c3|C53|Giuoco Piano, Classical
+e4 e5 Nf3 Nc6 Bc4 Bc5 b4|C51|Evans Gambit
+e4 e5 Nf3 Nc6 Bc4 Nf6|C55|Two Knights Defense
+e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5|C57|Two Knights, Knight Attack
+e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7|C57|Fried Liver Attack
+e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 Bc5|C57|Traxler Counterattack
+e4 e5 Nf3 Nc6 Bb5|C60|Ruy Lopez
+e4 e5 Nf3 Nc6 Bb5 Nf6|C65|Ruy Lopez, Berlin Defense
+e4 e5 Nf3 Nc6 Bb5 Nf6 O-O Nxe4|C67|Ruy Lopez, Open Variation
+e4 e5 Nf3 Nc6 Bb5 a6|C70|Ruy Lopez, Morphy Defense
+e4 e5 Nf3 Nc6 Bb5 a6 Bxc6|C68|Ruy Lopez, Exchange Variation
+e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O|C78|Ruy Lopez, Closed
+e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5|C84|Ruy Lopez, Closed
+e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 O-O c3 d5|C89|Marshall Attack
+e4 e5 Nf3 Nc6 Bb5 d6|C62|Ruy Lopez, Old Steinitz Defense
+e4 e5 Nf3 Nc6 Bb5 f5|C63|Schliemann Gambit
+e4 e5 Nf3 Nc6 Bb5 Nd4|C61|Ruy Lopez, Bird's Defense
+e4 e5 Nf3 Nc6 d4 exd4 Nxd4|C45|Scotch Game
+e4 e5 Nf3 Nc6 d4 exd4 Bc4|C44|Scotch Gambit
+e4 e5 Nf3 Nc6 c3|C44|Ponziani Opening
+e4 e5 Nf3 Nc6 Nc3 Nf6|C47|Four Knights Game
+e4 e5 Nf3 Nc6 Nc3 Nf6 Bb5|C48|Four Knights, Spanish Variation
+e4 e5 Nf3 Nc6 Nc3 Bc5|C46|Three Knights Game
+e4 e5 Nf3 Nf6|C42|Petrov's Defense
+e4 e5 Nf3 d6|C41|Philidor Defense
+e4 e5 Nf3 f5|C40|Latvian Gambit
+e4 e5 Nf3 d5|C40|Elephant Gambit
+e4 e5 Nc3|C25|Vienna Game
+e4 e5 Nc3 Nf6 f4||Vienna Gambit
+e4 e5 Bc4|C23|Bishop's Opening
+e4 e5 f4|C30|King's Gambit
+e4 e5 f4 d5|C31|King's Gambit, Falkbeer Counter-Gambit
+e4 e5 f4 exf4||King's Gambit Accepted
+e4 e5 d4 exd4 c3|C21|Danish Gambit
+e4 e5 d4 exd4 Qxd4|C21|Center Game
+e4 c5|B20|Sicilian Defense
+e4 c5 c3|B22|Sicilian, Alapin Variation
+e4 c5 d4|B21|Sicilian, Smith-Morra Gambit
+e4 c5 Nc3|B23|Sicilian, Closed
+e4 c5 Nc3 Nc6 f4|B23|Sicilian, Grand Prix Attack
+e4 c5 Nf3 d6|B50|Sicilian, d6 Systems
+e4 c5 Nf3 d6 Bb5+|B51|Sicilian, Moscow Variation
+e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6|B90|Sicilian, Najdorf Variation
+e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6|B70|Sicilian, Dragon
+e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6 Be3 Bg7 f3 O-O Qd2 Nc6 O-O-O|B76|Dragon, Yugoslav Attack
+e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6|B80|Sicilian, Scheveningen
+e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6||Sicilian, Classical
+e4 c5 Nf3 Nc6|B30|Old Sicilian
+e4 c5 Nf3 Nc6 Bb5|B30|Rossolimo Attack
+e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 e5|B33|Sveshnikov Variation
+e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 g6|B34|Accelerated Dragon
+e4 c5 Nf3 g6|B27|Hyper-accelerated Dragon
+e4 c5 Nf3 e6|B40|Sicilian, 2...e6
+e4 c5 Nf3 e6 d4 cxd4 Nxd4 a6|B42|Sicilian, Kan Variation
+e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6|B45|Sicilian, Taimanov Variation
+e4 c5 Nf3 Nf6||Nimzowitsch Variation
+e4 c5 Nf3 a6||O'Kelly Variation
+e4 e6|C00|French Defense
+e4 e6 d4 d5|C00|French Defense, Main Line
+e4 e6 d4 d5 e5|C02|French, Advance Variation
+e4 e6 d4 d5 exd5|C01|French, Exchange Variation
+e4 e6 d4 d5 Nd2|C03|French, Tarrasch Variation
+e4 e6 d4 d5 Nc3 Nf6|C11|French, Classical
+e4 e6 d4 d5 Nc3 Nf6 e5|C11|French, Steinitz
+e4 e6 d4 d5 Nc3 Bb4|C15|French, Winawer Variation
+e4 e6 d4 d5 Nc3 Bb4 e5 c5 a3 Bxc3+ bxc3 Ne7||Winawer, Poisoned Pawn
+e4 e6 d4 d5 Nc3 dxe4|C10|French, Rubinstein Variation
+e4 c6|B10|Caro-Kann Defense
+e4 c6 d4 d5|B12|Caro-Kann, Main Line
+e4 c6 d4 d5 e5|B12|Caro-Kann, Advance Variation
+e4 c6 d4 d5 exd5 cxd5|B13|Caro-Kann, Exchange Variation
+e4 c6 d4 d5 exd5 cxd5 c4 Nf6 Nc3 e6|B13|Caro-Kann, Panov-Botvinnik Attack
+e4 c6 d4 d5 Nc3 Bf5|B18|Caro-Kann, Classical Variation
+e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nd7|B17|Caro-Kann, Karpov Variation
+e4 c6 d4 d5 f3||Caro-Kann, Fantasy Variation
+e4 d5|B01|Scandinavian Defense
+e4 d5 exd5 Qxd5|B01|Scandinavian, Main Line
+e4 d6|B07|Pirc Defense
+e4 d6 d4 Nf6 Nc3 g6|B07|Pirc Defense
+e4 d6 d4 Nf6 Nc3 g6 f4|B09|Pirc, Austrian Attack
+e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7||Pirc, Classical System
+e4 g6|B06|Modern Defense
+e4 Nf6|B02|Alekhine's Defense
+e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4|B03|Alekhine, Four Pawns Attack
+e4 Nc6|B00|Nimzowitsch Defense
+e4 b6|B00|Owen Defense
+d4|A40|Queen's Pawn Opening
+d4 d5|D00|Queen's Pawn Game
+d4 d5 e4 dxe4 Nc3|D00|Blackmar-Diemer Gambit
+d4 d5 c4|D06|Queen's Gambit
+d4 d5 c4 e5|D06|Albin Counter-Gambit
+d4 d5 c4 Nc6|D07|Chigorin Defense
+d4 d5 c4 dxc4|D20|Queen's Gambit Accepted
+d4 d5 c4 e6|D30|Queen's Gambit Declined
+d4 d5 c4 e6 Nc3 Nf6 cxd5 exd5|D35|QGD, Exchange Variation
+d4 d5 c4 e6 Nc3 Nf6 Bg5|D50|QGD, Classical
+d4 d5 c4 e6 Nc3 Nf6 Bg5 Nbd7 e3 c6 Nf3 Qa5|D52|Cambridge Springs Defense
+d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Nbd7|D60|QGD, Orthodox
+d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 h6 Bh4 b6|D59|QGD, Tartakower Variation
+d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Ne4|D56|QGD, Lasker Defense
+d4 d5 c4 e6 Nc3 Nf6 Nf3 c5|D41|Semi-Tarrasch Defense
+d4 d5 c4 e6 Nc3 c5|D32|Tarrasch Defense
+d4 d5 c4 e6 Nc3 c5 cxd5 exd5 Nf3 Nc6 g3|D34|Tarrasch, Main Line
+d4 d5 c4 c6|D10|Slav Defense
+d4 d5 c4 c6 Nf3 Nf6 Nc3|D15|Slav, Main Line
+d4 d5 c4 c6 Nf3 Nf6 Nc3 e6|D43|Semi-Slav Defense
+d4 d5 c4 c6 Nf3 Nf6 Nc3 e6 e3 Nbd7 Bd3 dxc4|D44|Meran Variation
+d4 d5 c4 c6 Nf3 Nf6 Bg5||Semi-Slav, Moscow Variation
+d4 d5 Nc3 Nf6 Bg5|D01|Richter-Veresov Attack
+d4 d5 Nf3 Nf6 Bf4|D02|London System
+d4 d5 Nf3 Nf6 e3|D02|Colle System
+d4 Nf6|A45|Indian Game
+d4 Nf6 Bg5|A45|Trompowsky Attack
+d4 Nf6 Nc3 d5 Bf4||Jobava London
+d4 Nf6 Nf3 e6 Bg5||Torre Attack
+d4 Nf6 c4 c5 d5 e6|A56|Modern Benoni
+d4 Nf6 c4 c5 d5 b5|A57|Benko Gambit
+d4 Nf6 c4 c5 d5 e5||Czech Benoni
+d4 Nf6 c4 e5|A51|Budapest Gambit
+d4 Nf6 c4 d6|A53|Old Indian Defense
+d4 Nf6 c4 e6 Nf3 b6|E12|Queen's Indian Defense
+d4 Nf6 c4 e6 Nf3 b6 g3 Bb7|E15|Queen's Indian, Fianchetto Variation
+d4 Nf6 c4 e6 Nf3 Bb4+|E11|Bogo-Indian Defense
+d4 Nf6 c4 e6 Nc3 Bb4|E20|Nimzo-Indian Defense
+d4 Nf6 c4 e6 Nc3 Bb4 e3|E40|Nimzo-Indian, Rubinstein Variation
+d4 Nf6 c4 e6 Nc3 Bb4 Qc2|E32|Nimzo-Indian, Classical
+d4 Nf6 c4 e6 Nc3 Bb4 a3||Nimzo-Indian, Sämisch
+d4 Nf6 c4 e6 g3|E00|Catalan Opening
+d4 Nf6 c4 e6 g3 d5 Bg2 dxc4|E05|Catalan, Open Variation
+d4 Nf6 c4 e6 g3 d5 Bg2 Be7|E06|Catalan, Closed Variation
+d4 Nf6 c4 g6|E60|King's Indian Defense
+d4 Nf6 c4 g6 Nc3 Bg7 e4 d6|E70|King's Indian, Main Line
+d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7|E94|King's Indian, Classical
+d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7 Ne1|E97|King's Indian, Mar del Plata
+d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f4|E76|King's Indian, Four Pawns Attack
+d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f3|E80|King's Indian, Sämisch
+d4 Nf6 c4 g6 Nf3 Bg7 g3|E60|King's Indian, Fianchetto
+d4 Nf6 c4 g6 Nc3 d5|D80|Grünfeld Defense
+d4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4 Nxc3 bxc3|D85|Grünfeld, Exchange Variation
+d4 Nf6 c4 g6 Nc3 d5 Nf3 Bg7|D90|Grünfeld, Russian System
+d4 f5|A80|Dutch Defense
+d4 f5 g3 Nf6 Bg2 g6|A87|Dutch, Leningrad
+d4 f5 c4 Nf6 g3 e6 Bg2 Be7 Nf3 d5||Dutch, Stonewall
+d4 c5|A43|Old Benoni
+d4 e5|A40|Englund Gambit
+d4 Nf6 Nf3 g6|A48|East Indian Defense
+c4|A10|English Opening
+c4 e5|A20|King's English
+c4 e5 Nc3 Nf6 Nf3 Nc6|A29|English, Four Knights
+c4 c5|A30|English, Symmetrical Variation
+c4 Nf6|A15|Anglo-Indian Defense
+c4 e6|A13|English, Agincourt Defense
+Nf3|A04|Réti Opening
+Nf3 d5|A05|Réti Opening
+Nf3 d5 g3|A07|King's Indian Attack
+f4|A02|Bird's Opening
+b3|A01|Nimzo-Larsen Attack
+g3|A00|Benko's Opening
+b4|A00|Polish (Sokolsky) Opening
+g4|A00|Grob's Attack
+Nc3|A00|Dunst (Van Geet) Opening
+e3|A00|Van 't Kruijs Opening
+d3|A00|Mieses Opening
+f3|A00|Barnes Opening
+h3|A00|Clemenz Opening
+h4|A00|Desprez Opening
+a3|A00|Anderssen's Opening
+a4|A00|Ware Opening
+c3|A00|Saragossa Opening
+Na3|A00|Durkin's Opening
+Nh3|A00|Amar Opening
+`.trim().split("\n").map(line => {
+  const [moves, eco, name] = line.split("|");
+  return { moves: moves.replace(/[+#]/g, ""), eco: eco || null, name };
+});
+
+// Longest-prefix match of the game's SAN history against the book.
+// `(str + " ").startsWith(...)` covers both the exact line and the line
+// being a prefix of the played moves.
+function openingInfo() {
+  if (!history.length) return null;
+  const str = history.map(h => h.san.replace(/[+#]/g, "")).join(" ");
+  let best = null, bestLen = 0;
+  for (const op of OPENING_BOOK) {
+    if (op.moves.length > bestLen && (str + " ").startsWith(op.moves + " ")) {
+      bestLen = op.moves.length; best = op;
+    }
+  }
+  return best;
+}
+
 function updateSetupMeta() {
   setupMetaEl.textContent = `vs engine · ${LEVELS[levelIdx].name}`;
 }
 
 function updateStatus() {
   updateSetupMeta();
+  const op = openingInfo();
+  openingTagEl.textContent = op ? (op.eco ? op.eco + " · " + op.name : op.name) : "";
   if (thinking) {
     const label = state.turn === "w" ? "White" : "Black";
     statusEl.innerHTML =

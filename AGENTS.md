@@ -215,6 +215,17 @@ request it sends the **full move list**; the engine replays it from
   from `render()` and from the `info` handler, so the bar moves live
   during search. New game resets it to equal; game end snaps it to
   100/0/50.
+- **Opening names**: `OPENING_BOOK` is a compact controller-side ECO table
+  (~120 common lines, embedded as a `"SAN moves|ECO|Name"` template string,
+  parsed once at init). `openingInfo()` finds the longest book line that is
+  a prefix of the SAN history — `+`/`#` are stripped from both sides and
+  castling is `O-O`/`O-O-O`, matching `moveToSan` output, so no
+  normalization of engine data is needed. `updateStatus()` renders the
+  match as a chip (`.opening-tag`, hidden when empty) under the status
+  text; after leaving book it keeps showing the line the game transposed
+  into. ECO codes are approximate at variation level (some entries are
+  name-only); the book is also reusable for a future PGN export (ECO
+  header). No engine changes involved.
 
 ## Verifying changes
 
