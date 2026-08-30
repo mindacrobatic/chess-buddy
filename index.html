@@ -176,7 +176,12 @@
   .panel {
     width: 320px;
     align-self: flex-start;
+    /* Fixed height so the panel never resizes the page while playing.
+       JS (--board-h) keeps it matched to the board on desktop; the
+       narrow-screen media query falls back to the viewport cap. */
+    height: var(--board-h, calc(100vh - 48px));
     max-height: calc(100vh - 48px);
+    overflow: hidden;
     background: rgba(15, 23, 42, .58);
     border: 1px solid rgba(148, 163, 184, .14);
     border-radius: 16px;
@@ -192,6 +197,12 @@
     border: 1px solid rgba(148, 163, 184, .14);
     border-radius: 12px;
     padding: 12px 14px;
+    /* Every flex child of the fixed-height .panel must be non-shrinking
+       (.moves-card re-enables shrink below) — otherwise all children
+       shrink together proportionally when the PV line wraps, which is
+       what made "everything below the engine field move". The same rule
+       applies to .app-title and .btns. */
+    flex-shrink: 0;
   }
   .card-h {
     display: flex;
@@ -220,6 +231,7 @@
     letter-spacing: 4px;
     text-transform: uppercase;
     color: #e2e8f0;
+    flex-shrink: 0;   /* like .card — panel children must not shrink */
   }
   .app-title .title-glyph {
     font-size: 22px;
@@ -229,10 +241,12 @@
   .status {
     font-size: 17px;
     font-weight: 700;
-    min-height: 24px;
+    height: 24px;                 /* fixed: one line, never wraps */
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    overflow: hidden;
   }
   .status .badge {
     display: inline-block;
@@ -263,9 +277,17 @@
     0%, 60%, 100% { transform: translateY(0); opacity: .35; }
     30% { transform: translateY(-4px); opacity: 1; }
   }
-  .mat-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; min-height: 30px; }
+  .mat-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; height: 30px; }
   .mat-who { width: 44px; flex: none; font-size: 12px; font-weight: 700; color: #94a3b8; }
-  .mat-pcs { flex: 1; font-size: 21px; letter-spacing: 2px; line-height: 1.2; }
+  .mat-pcs {
+    flex: 1;
+    min-width: 0;
+    font-size: 21px;
+    letter-spacing: 2px;
+    line-height: 1.2;
+    white-space: nowrap;          /* clip long capture lists, never wrap */
+    overflow: hidden;
+  }
   .chip {
     flex: none;
     font-size: 11px;
@@ -276,11 +298,14 @@
     padding: 2px 8px;
   }
   .chip.even { color: #94a3b8; background: rgba(148, 163, 184, .15); }
-  .moves-card { flex: none; display: flex; flex-direction: column; min-height: 120px; }
+  /* Absorbs all leftover space in the fixed-height panel; the list itself
+     scrolls, so the panel height never changes as moves are added. Also
+     absorbs growth of the PV line above (status card is flex-shrink:0):
+     the moves list just shows fewer rows at once (it scrolls internally). */
+  .moves-card { flex: 1 1 0; flex-shrink: 1; display: flex; flex-direction: column; min-height: 0; }
   .moves {
     flex: 1;
     min-height: 0;
-    max-height: 260px;
     overflow-y: auto;
     font-family: ui-monospace, Menlo, monospace;
     font-size: 13px;
@@ -293,7 +318,7 @@
   .mrow:nth-child(odd) { background: rgba(148, 163, 184, .06); }
   .mrow .num { color: #64748b; }
   .mrow .mv.last { color: #93c5fd; font-weight: 700; }
-  .btns { display: flex; flex-direction: column; gap: 8px; }
+  .btns { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
   .btns .row2 { display: flex; gap: 8px; }
   #soundBtn svg { width: 17px; height: 17px; vertical-align: -3px; }
   button {
@@ -422,13 +447,19 @@
     padding-top: 6px;
     border-top: 1px dashed rgba(148, 163, 184, .18);
     line-height: 1.55;
-    max-height: 74px;
+    /* Fixed 3-line box (+6px top padding, border-box sizing): the status
+       card keeps its height no matter how many lines the PV wraps to —
+       longer lines scroll inside instead of pushing the cards below up
+       and down. */
+    height: calc(1.55em * 3 + 6px);
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #334155 transparent;
     word-break: break-word;
   }
-  .engline:empty { display: none; }
+  .engline::-webkit-scrollbar { width: 8px; }
+  .engline::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  /* stays in the layout when empty so the status card keeps its height */
   .engline .n { color: #64748b; }
   .engline .mv { color: #cbd5e1; }
   .engline .mv.first { color: #93c5fd; font-weight: 700; }
@@ -436,7 +467,9 @@
   .engline.stale { opacity: .45; }
   .engline { transition: opacity .25s ease; }
   .opening-tag {
-    display: inline-block;
+    display: block;
+    width: fit-content;
+    max-width: 100%;
     margin-top: 6px;
     font-size: 11.5px;
     color: #93c5fd;
@@ -444,8 +477,17 @@
     border: 1px solid rgba(59, 130, 246, .28);
     border-radius: 999px;
     padding: 3px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .opening-tag:empty { display: none; }
+  /* Reserve the line even with no opening name: the chip stays visible but
+     transparent, so the status card never grows when a name appears. */
+  .opening-tag:empty {
+    display: block;
+    visibility: hidden;
+  }
+  .opening-tag:empty::after { content: "\00a0"; }
   .strength-row { display: none; }
   .strength-row.visible { display: block; }
   .mini-label {
@@ -583,6 +625,11 @@
   }
 
   @media (max-width: 720px) {
+    /* Stacked layout (panel below the board): keep the fixed-height panel
+       bound to the board (--board-h / syncPanelHeight works there too)
+       so card positions stay stable while the PV line wraps; the moves
+       card absorbs the growth exactly as on wide viewports. The width
+       order tweaks still apply. */
     .panel { width: min(92vw, 500px); order: 2; }
     .chat-panel { align-self: auto; }
     .chat-card { flex: none; }
@@ -605,7 +652,7 @@
   <div class="panel">
     <div class="app-title"><span class="title-glyph">♞</span> Chess</div>
 
-    <div class="card">
+    <div class="card status-card">
       <div class="card-h">Status <span class="right" id="setupMeta"></span></div>
       <div class="status" id="status"></div>
       <div class="opening-tag" id="openingTag"></div>
@@ -2134,6 +2181,7 @@ const PV_PLIES = 20;
 
 function renderPvLine(pv) {
   engPvEl.textContent = "";
+  engPvEl.scrollTop = 0; /* fixed-height box: always show the engine's next move */
   if (!pv || !pv.length) return;
   let cur = state;
   const sans = [];
@@ -3194,12 +3242,22 @@ function saveBoardSize(w) {
   try { saved = +localStorage.getItem("chessBoardSize") || 0; } catch (e) {}
   if (saved >= RSZ_MIN) boardOuter.style.width = Math.min(saved, boardMaxWidth()) + "px";
 })();
+function syncPanelHeight() {
+  // Board is square: pin the side panels to the board frame's outer height
+  // so every column ends flush and panel content never changes page layout.
+  const h = boardOuter.getBoundingClientRect().height;
+  if (h > 0)
+    document.documentElement.style.setProperty("--board-h", Math.round(h) + "px");
+}
 if (typeof ResizeObserver !== "undefined") {
   new ResizeObserver(entries => {
     for (const en of entries)
       boardOuter.style.setProperty("--sq", (en.contentRect.width / 8) + "px");
+    syncPanelHeight();
   }).observe(boardEl);
 }
+syncPanelHeight();
+window.addEventListener("resize", syncPanelHeight);
 let rszDrag = null;
 resizeHandle.addEventListener("pointerdown", e => {
   e.preventDefault();

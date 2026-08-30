@@ -7,7 +7,7 @@ tests — each demo is a single `.html` file opened directly in a browser.
 
 Current demos:
 
-- `chess/index.html` — chess vs. an in-browser engine
+- `index.html` — chess vs. an in-browser engine
   (~2300 lines, everything inline).
 
 ## Tech conventions
@@ -30,7 +30,7 @@ python3 -m http.server 8000
 # then visit http://localhost:8000/chess/
 ```
 
-## `chess/index.html` architecture
+## `index.html` architecture
 
 The file has four parts, in order:
 
@@ -38,10 +38,25 @@ The file has four parts, in order:
 2. **HTML markup** (lines ~419–500) — board container, main side panel
    (card-based: status / game setup with mode + strength / material /
    moves / buttons), a second `.chat-panel` column for the chat card,
-   promotion overlay. On narrow screens the chat panel wraps below the
-   main panel with a fixed-height log. The moves list is capped at
-   `max-height: 260px` on `.moves` and scrolls internally; `renderMoves()`
-   auto-scrolls it to the latest move.
+   promotion overlay. **The panels have a fixed height** so gameplay can
+   never shift the page layout: `.panel` is
+   `height: var(--board-h, calc(100vh - 48px))` with `overflow: hidden`,
+   and `syncPanelHeight()` (board `ResizeObserver` + window resize) pins
+   `--board-h` to the board frame's outer height. Inside, every
+   variable-height element is pinned or absorbed: `.status` is a fixed
+   one-line box (no wrap), the opening chip (`.opening-tag:empty`) stays
+   visible-but-transparent when empty, `.engline` keeps a two-line
+   `min-height` when empty but expands (`overflow: visible`) to show the
+   full PV line — all sibling children of `.panel` (`.card`, `.app-title`,
+   `.btns`) are explicitly `flex-shrink: 0`, otherwise flexbox would
+   shrink **every** child proportionally and "everything below the engine
+   field moves"; the moves card alone re-enables shrink (`flex: 1 1 0`),
+   `.mat-pcs` clips long capture lists on one line, and
+   the moves card absorbs all leftover space (including `.engline`
+   growth) — `.moves`
+   scrolls internally and `renderMoves()` auto-scrolls to the latest
+   move. The ≤720px media query reverts panels to natural height
+   (`.moves` gets its old `max-height: 260px` cap there).
 3. **Engine source, as inert text** (lines ~481–1543) —
    `<script id="engine-src" type="text/plain">`. This is the engine.
    Because its type is `text/plain`, the browser does not execute it. The
@@ -188,9 +203,7 @@ request it sends the **full move list**; the engine replays it from
   lazily and unlocked on the first `pointerdown` (autoplay policy — engine
   moves have no gesture of their own). Mute toggle is the `soundBtn`
   (Feather-style monochrome SVG speaker injected via `drawSoundIcon()`)
-  in the button row; state persists as `chessSound`. Alternative packs
-  (Classic Wood with a noise "thock", Modern Click, Retro 8-bit,
-  Cinematic) live in `chess/sounds.html` for preview.
+  in the button row; state persists as `chessSound`.
 - **Live engine line + stat grid**: engine progress is shown in a 3×2
   `.engstats` grid (`engStatsEls`: depth, eval, nodes, speed, time,
   pv plies) plus the SAN line `.engline` (`engPvEl`). `setEngineStats()`
@@ -203,8 +216,11 @@ request it sends the **full move list**; the engine replays it from
   `legalMoves`/`makeMove`/`moveToSan` — same rules as the board, so
   castling, disambiguation, and check/mate marks are correct. It breaks
   silently on any unmatched move. The line renders as DOM spans (never
-  innerHTML): dim move numbers, the engine's next move highlighted, wraps
-  in a ~74px scrollable box, full text duplicated into the hover tooltip.
+  innerHTML): dim move numbers, the engine's next move highlighted,
+  shown in full by wrapping into the moves-card space (`.engline` has
+  a two-line `min-height` so the empty box keeps its footprint; the
+  status card is `flex-shrink: 0` and the moves card `flex: 1 1 0`
+  so it absorbs the growth). Full text also lands in the hover tooltip.
   The line **persists after the engine moves**: when the next search
   starts it is only dimmed (`.engline.stale`, 45% opacity) until the
   first `info` message replaces it — it is fully cleared only on New
