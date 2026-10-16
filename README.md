@@ -4,7 +4,7 @@ Your next chess opponent lives in a single HTML file.
 
 Chess Buddy is a self-contained browser chess game with a built-in engine and optional opponent chat. Play as White or Black, watch the engine think, and pick a challenge—from Newbie to Boss mode.
 
-![Chess Buddy showing a wooden chessboard, live engine statistics, move history, and optional opponent chat](docs/chess-buddy.png)
+![Chess Buddy showing a wooden chessboard, live engine statistics, move history, and optional opponent chat](docs/chess-buddy-preview.png)
 
 Everything lives in one HTML file: layout, styles, chess rules, engine, and sound effects. No installation, build step, external libraries, or backend is required to play. Chess runs locally and works offline; only the optional chat needs an internet connection and an OpenRouter API key.
 
